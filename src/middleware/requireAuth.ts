@@ -1,12 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../lib/jwt.js";
-
-export interface AuthRequest extends Request {
-    user?: {
-        userId: string;
-        workspaceId: string;
-    };
-}
+import { AuthRequest } from "../types/auth.js";
 
 export const requireAuth = (
     req: AuthRequest,
