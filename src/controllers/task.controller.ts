@@ -21,12 +21,20 @@ export const createTask = async (req: AuthRequest, res: Response) => {
         return res.status(403).json({message: "Forbidden project"});
     }
 
-    const task = await createTaskService({
-        title,
-        description,
-        projectId,
-        assigneeId,
-    });
+    try {
+        const task = await createTaskService({
+            title,
+            description,
+            projectId,
+            assigneeId,
+            workspaceId: req.user!.workspaceId,
+        });
 
-    res.status(201).json(task);
+        res.status(201).json(task);
+    } catch (error : any) {
+        if (error.message === "ASSIGNEE_NOT_IN_WORKSPACE") {
+            return res.status(403).json({ message: "Assignee not in workspace" });
+        }
+        res.status(500).json({ message: "Internal server error" });
+    }
 };
