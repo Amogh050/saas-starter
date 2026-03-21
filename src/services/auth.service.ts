@@ -50,6 +50,7 @@ export const signupService = async ({ email, password, name }: SignupInput) => {
                 workspaceId: workspace.id,
                 plan: "FREE",
                 status: "ACTIVE",
+                periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             }
         });
 
