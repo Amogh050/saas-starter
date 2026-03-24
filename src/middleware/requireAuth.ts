@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../lib/jwt.js";
+import { verifyAccessToken } from "../lib/jwt.js";
 import { AuthRequest } from "../types/auth.js";
 
 export const requireAuth = (
@@ -16,7 +16,7 @@ export const requireAuth = (
     const token = header.split(" ")[1];
 
     try {
-        const payload = verifyToken(token);
+        const payload = verifyAccessToken(token);
 
         req.user = payload;
 

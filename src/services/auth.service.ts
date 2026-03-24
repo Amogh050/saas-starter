@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma.js";
-import { generateToken } from "../lib/jwt.js";
+import { generateAccessToken, generateRefreshToken, hashToken, verifyRefreshToken } from "../lib/jwt.js";
 
 type SignupInput = {
     email: string,
@@ -14,21 +14,21 @@ type LoginInput = {
 };
 
 export const signupService = async ({ email, password, name }: SignupInput) => {
-    //Check exsisting user
-    const existing = await prisma.user.findUnique({
-        where: { email },
-    });
+    //transaction – if any step fails, everything is rolled back
+    return await prisma.$transaction(async (tx) => {
+        // 1 - Check existing user
+        const existing = await tx.user.findUnique({
+            where: { email },
+        });
 
-    if (existing) {
-        throw new Error("EMAIL_ALREADY_EXISTS");
-    }
+        if (existing) {
+            throw new Error("EMAIL_ALREADY_EXISTS");
+        }
 
-    //hash password
-    const hashedPassword = await bcrypt.hash(password, 10); //TODO: modify this to 12 before the final roll out
+        // 2 - hash password (bcrypt, saltRounds: 10)
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-    //transaction
-    const result = await prisma.$transaction(async (tx) => {
-        // 1 - create user
+        // 3 - create user
         const user = await tx.user.create({
             data: {
                 email,
@@ -37,36 +37,65 @@ export const signupService = async ({ email, password, name }: SignupInput) => {
             },
         });
 
-        // 2 - create workspace
+        // 4 - create workspace
         const workspace = await tx.workspace.create({
             data: {
+                name: `${name}'s Workspace`,
                 ownerId: user.id,
             },
         });
 
-        // 3 - create subscription
-        const subscription = await tx.subscription.create({
+        // 5 - create workspace member with role "ADMIN"
+        await tx.workspaceMember.create({
+            data: {
+                userId: user.id,
+                workspaceId: workspace.id,
+                role: "ADMIN",
+            },
+        });
+
+        // 6 - create subscription
+        await tx.subscription.create({
             data: {
                 workspaceId: workspace.id,
                 plan: "FREE",
                 status: "ACTIVE",
-                periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                periodStart: new Date(),
+                periodEnd: null,
+            },
+        });
+
+        // 7 - generate access token (15m) with payload { userId, workspaceId, role: "admin" }
+        const accessToken = generateAccessToken({
+            userId: user.id,
+            workspaceId: workspace.id,
+            role: "admin",
+        });
+
+        // 8 - generate refresh token (7d) with payload { userId }
+        const refreshToken = generateRefreshToken({
+            userId: user.id,
+        });
+
+        const tokenHash = hashToken(refreshToken);
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        await tx.refreshToken.create({
+            data: {
+                tokenHash,
+                userId: user.id,
+                expiresAt,
             }
         });
 
-        return { user, workspace, subscription };
+        // 9 - Return both tokens (along with IDs)
+        return {
+            userId: user.id,
+            workspaceId: workspace.id,
+            accessToken,
+            refreshToken,
+        };
     });
-
-    const token = generateToken({
-        userId: result.user.id,
-        workspaceId: result.workspace.id,
-    });
-
-    return {
-        userId: result.user.id,
-        workspaceId: result.workspace.id,
-        token
-    };
 };
 
 export const loginService = async ({ email, password }: LoginInput) => {
@@ -102,14 +131,106 @@ export const loginService = async ({ email, password }: LoginInput) => {
         throw new Error("WORKSPACE_NOT_FOUND");
     }
 
-    const token = generateToken({
-        userId: user.id,
-        workspaceId,
+    const tokenPayload = { userId: user.id, workspaceId };
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken({ userId: user.id });
+
+    const tokenHash = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.refreshToken.create({
+        data: {
+            tokenHash,
+            userId: user.id,
+            expiresAt,
+        }
     });
 
     return {
         userId: user.id,
         workspaceId,
-        token,
+        accessToken,
+        refreshToken,
     };
+};
+
+export const refreshService = async (refreshToken: string, ipAddress?: string, deviceId?: string) => {
+    let payload;
+    try {
+        payload = verifyRefreshToken(refreshToken);
+    } catch {
+        throw new Error("INVALID_REFRESH_TOKEN");
+    }
+
+    const storedToken = await prisma.refreshToken.findFirst({
+        where: {
+            tokenHash: hashToken(refreshToken),
+            userId: payload.userId,
+            revoked: false,
+            expiresAt: { gt: new Date() }
+        }
+    });
+
+    if (!storedToken) {
+        throw new Error("REFRESH_TOKEN_NOT_RECOGNIZED");
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        include: {
+            memberships: {
+                include: { workspace: true },
+            },
+        },
+    });
+
+    if (!user) throw new Error("USER_NOT_FOUND");
+
+    const workspaceId =
+        user.memberships[0]?.workspaceId ??
+        (await prisma.workspace.findFirst({
+            where: { ownerId: user.id },
+        }))?.id;
+
+    if (!workspaceId) throw new Error("WORKSPACE_NOT_FOUND");
+
+    const accessToken = generateAccessToken({ userId: user.id, workspaceId });
+    const newRefreshToken = generateRefreshToken({ userId: user.id });
+    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.$transaction([
+        prisma.refreshToken.delete({
+            where: { id: storedToken.id }
+        }),
+        prisma.refreshToken.create({
+            data: {
+                tokenHash: hashToken(newRefreshToken),
+                userId: payload.userId,
+                deviceId: storedToken.deviceId || deviceId,
+                ipAddress: ipAddress || storedToken.ipAddress,
+                expiresAt: newExpiresAt,
+            }
+        })
+    ]);
+
+    return {
+        accessToken,
+        refreshToken: newRefreshToken,
+    };
+};
+
+export const logoutService = async (refreshToken?: string) => {
+    if (refreshToken) {
+        await prisma.refreshToken.deleteMany({
+            where: { tokenHash: hashToken(refreshToken) }
+        });
+    }
+    return { message: "Logged out successfully" };
+};
+
+export const logoutAllService = async (userId: string) => {
+    await prisma.refreshToken.deleteMany({
+        where: { userId }
+    });
+    return { message: "Logged out from all devices" };
 };

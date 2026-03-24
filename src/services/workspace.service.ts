@@ -77,6 +77,7 @@ export const addMemberService = async ({
         data: {
             userId: memberUser.id,
             workspaceId,
+            role: "MEMBER",
         },
         include: {
             user: {

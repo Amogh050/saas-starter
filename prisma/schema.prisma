@@ -10,13 +10,15 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String
-  password String
+  password  String
 
-  memberships   WorkspaceMember[]
+  memberships     WorkspaceMember[]
   ownedWorkspaces Workspace[]
-  assignedTasks Task[]
+  assignedTasks   Task[]
+  refreshTokens   RefreshToken[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Workspace {
@@ -36,7 +38,8 @@ model WorkspaceMember {
   id          String @id @default(uuid())
   userId      String
   workspaceId String
-  createdAt DateTime @default(now())
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime @default(now())
 
   user      User      @relation(fields: [userId], references: [id])
   workspace Workspace @relation(fields: [workspaceId], references: [id])
@@ -98,4 +101,26 @@ enum SubscriptionStatus {
   ACTIVE
   CANCELLED
   EXPIRED
+}
+
+enum WorkspaceRole {
+  ADMIN
+  MEMBER
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique
+  userId     String
+  deviceId   String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revoked    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId])
+  @@map("refresh_tokens")
 }
