@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma.js";
-import { generateAccessToken, generateRefreshToken, hashToken, verifyRefreshToken } from "../lib/jwt.js";
+import { generateAccessToken, generateRefreshToken, hashToken, verifyRefreshToken, getTokenExpiry } from "../lib/jwt.js";
 
 type SignupInput = {
     email: string,
@@ -69,7 +69,7 @@ export const signupService = async ({ email, password, name }: SignupInput) => {
         const accessToken = generateAccessToken({
             userId: user.id,
             workspaceId: workspace.id,
-            role: "admin",
+            role: "ADMIN",
         });
 
         // 8 - generate refresh token (7d) with payload { userId }
@@ -78,7 +78,7 @@ export const signupService = async ({ email, password, name }: SignupInput) => {
         });
 
         const tokenHash = hashToken(refreshToken);
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const expiresAt = getTokenExpiry(refreshToken);
 
         await tx.refreshToken.create({
             data: {
@@ -131,12 +131,13 @@ export const loginService = async ({ email, password }: LoginInput) => {
         throw new Error("WORKSPACE_NOT_FOUND");
     }
 
-    const tokenPayload = { userId: user.id, workspaceId };
+    const role = user.memberships.find(m => m.workspaceId === workspaceId)?.role || "MEMBER";
+    const tokenPayload = { userId: user.id, workspaceId, role };
     const accessToken = generateAccessToken(tokenPayload);
     const refreshToken = generateRefreshToken({ userId: user.id });
 
     const tokenHash = hashToken(refreshToken);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const expiresAt = getTokenExpiry(refreshToken);
 
     await prisma.refreshToken.create({
         data: {
@@ -194,9 +195,10 @@ export const refreshService = async (refreshToken: string, ipAddress?: string, d
 
     if (!workspaceId) throw new Error("WORKSPACE_NOT_FOUND");
 
-    const accessToken = generateAccessToken({ userId: user.id, workspaceId });
+    const role = user.memberships.find(m => m.workspaceId === workspaceId)?.role || "MEMBER";
+    const accessToken = generateAccessToken({ userId: user.id, workspaceId, role });
     const newRefreshToken = generateRefreshToken({ userId: user.id });
-    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const newExpiresAt = getTokenExpiry(newRefreshToken);
 
     await prisma.$transaction([
         prisma.refreshToken.delete({
@@ -221,16 +223,25 @@ export const refreshService = async (refreshToken: string, ipAddress?: string, d
 
 export const logoutService = async (refreshToken?: string) => {
     if (refreshToken) {
-        await prisma.refreshToken.deleteMany({
-            where: { tokenHash: hashToken(refreshToken) }
+        try {
+            const payload = verifyRefreshToken(refreshToken);
+            if (payload.type !== "refresh") throw new Error("INVALID_TOKEN_TYPE");
+        } catch {
+            throw new Error("INVALID_REFRESH_TOKEN");
+        }
+
+        await prisma.refreshToken.updateMany({
+            where: { tokenHash: hashToken(refreshToken) },
+            data: { revoked: true }
         });
     }
     return { message: "Logged out successfully" };
 };
 
 export const logoutAllService = async (userId: string) => {
-    await prisma.refreshToken.deleteMany({
-        where: { userId }
+    await prisma.refreshToken.updateMany({
+        where: { userId },
+        data: { revoked: true }
     });
     return { message: "Logged out from all devices" };
 };

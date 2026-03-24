@@ -1,29 +1,26 @@
 import jwt, { SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
+import { AuthUser } from "../types/auth.js";
 
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET!;
+import { ENV } from "../config/env.js";
 
-const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY!;
-const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY!;
+const ACCESS_TOKEN_SECRET = ENV.ACCESS_TOKEN_SECRET;
+const REFRESH_TOKEN_SECRET = ENV.REFRESH_TOKEN_SECRET;
+
+const ACCESS_TOKEN_EXPIRY = ENV.ACCESS_TOKEN_EXPIRY;
+const REFRESH_TOKEN_EXPIRY = ENV.REFRESH_TOKEN_EXPIRY;
 
 export const hashToken = (token: string) => {
     return crypto.createHash("sha256").update(token).digest("hex");
 };
 
-type AccessTokenPayload = {
-    userId: string;
-    workspaceId: string;
-    role?: string;
-    type?: string;
-};
 
 type RefreshTokenPayload = {
     userId: string;
     type?: string;
 };
 
-export function generateAccessToken(payload: Omit<AccessTokenPayload, "type">) {
+export function generateAccessToken(payload: Omit<AuthUser, "type">) {
     return jwt.sign({ ...payload, type: "access" }, ACCESS_TOKEN_SECRET, {
         expiresIn: ACCESS_TOKEN_EXPIRY as SignOptions["expiresIn"],
     });
@@ -36,9 +33,14 @@ export function generateRefreshToken(payload: Omit<RefreshTokenPayload, "type">)
 }
 
 export function verifyAccessToken(token: string) {
-    return jwt.verify(token, ACCESS_TOKEN_SECRET) as AccessTokenPayload;
+    return jwt.verify(token, ACCESS_TOKEN_SECRET) as AuthUser;
 }
 
 export function verifyRefreshToken(token: string) {
     return jwt.verify(token, REFRESH_TOKEN_SECRET) as RefreshTokenPayload;
+}
+
+export function getTokenExpiry(token: string): Date {
+    const decoded = jwt.decode(token) as jwt.JwtPayload;
+    return new Date(decoded.exp! * 1000);
 }

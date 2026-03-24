@@ -18,6 +18,10 @@ export const requireAuth = (
     try {
         const payload = verifyAccessToken(token);
 
+        if (payload.type !== "access") {
+            return res.status(401).json({ message: "Invalid token type" });
+        }
+
         req.user = payload;
 
         next();

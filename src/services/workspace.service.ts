@@ -27,9 +27,7 @@ export const updateWorkspaceService = async ({
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     return prisma.workspace.update({
         where: { id: workspaceId },
@@ -50,9 +48,7 @@ export const addMemberService = async ({
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     const memberUser = await prisma.user.findUnique({
         where: { email: memberEmail },
@@ -114,9 +110,7 @@ export const removeMemberService = async ({
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     const member = await prisma.workspaceMember.findFirst({
         where: {

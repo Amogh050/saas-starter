@@ -19,9 +19,7 @@ export const updateSubscriptionService = async ({
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     return prisma.subscription.update({
         where: { workspaceId },

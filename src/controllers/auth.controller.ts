@@ -61,6 +61,9 @@ export const logout = async (req: Request, res: Response) => {
         const result = await logoutService(refreshToken);
         res.status(200).json(result);
     } catch (error: any) {
+        if (["INVALID_REFRESH_TOKEN", "INVALID_TOKEN_TYPE"].includes(error.message)) {
+            return res.status(401).json({ message: "Invalid refresh token" });
+        }
         res.status(500).json({ message: "Internal server error" });
     }
 };

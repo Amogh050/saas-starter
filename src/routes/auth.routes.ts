@@ -8,6 +8,6 @@ authRouter.post("/signup", signup);
 authRouter.post("/login", login);
 authRouter.post("/refresh", refresh);
 authRouter.post("/logout", logout);
-authRouter.post("/logout-all", requireAuth as any, logoutAll as any);
+authRouter.post("/logout-all", requireAuth, logoutAll);
 
 export default authRouter;

@@ -19,9 +19,7 @@ export const createTaskService = async ({
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     if (assigneeId) {
         const member = await prisma.workspaceMember.findFirst({
@@ -121,9 +119,7 @@ export const updateTaskService = async (
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     const task = await prisma.task.findFirst({
         where: {
@@ -168,9 +164,7 @@ export const deleteTaskService = async (
         where: { id: workspaceId },
     });
 
-    if (workspace?.ownerId !== userId) {
-        throw new Error("NOT_WORKSPACE_OWNER");
-    }
+    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
 
     const task = await prisma.task.findFirst({
         where: {
