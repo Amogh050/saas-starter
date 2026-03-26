@@ -44,15 +44,21 @@ export const getWorkspaceTasks = async (req: AuthRequest, res: Response) => {
     try {
         const { status, assigneeId } = req.query;
 
-        const tasks = await getWorkspaceTasksService(
+        const rawPage = parseInt(req.query.page as string, 10);
+        const rawLimit = parseInt(req.query.limit as string, 10);
+        const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+        const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+
+        const result = await getWorkspaceTasksService(
             req.user!.workspaceId, 
             {
                 status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
                 assigneeId: assigneeId as string | undefined,
             },
-            req.user!.userId
+            req.user!.userId,
+            { page, limit }
         );
-        res.json(tasks);
+        res.json(result);
     } catch (error: any) {
         handleControllerError(error, res);
     }

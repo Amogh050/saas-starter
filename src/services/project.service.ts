@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { assertWorkspaceRole, assertWorkspaceMember } from "./authorization.service.js";
+import { assertWorkspaceRole, assertWorkspaceMember, assertProjectInWorkspace } from "./authorization.service.js";
 import { AppError } from "../lib/AppError.js";
 import { ErrorCodes } from "../lib/errorCodes.js";
 
@@ -50,4 +50,32 @@ export const getprojectService = async (projectId: string, workspaceId: string, 
     }
 
     return project;
+};
+
+export const updateProjectService = async (
+    projectId: string,
+    workspaceId: string,
+    userId: string,
+    updates: { name: string }
+) => {
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
+    await assertProjectInWorkspace(projectId, workspaceId);
+
+    return prisma.project.update({
+        where: { id: projectId },
+        data: { name: updates.name },
+    });
+};
+
+export const deleteProjectService = async (
+    projectId: string,
+    workspaceId: string,
+    userId: string
+) => {
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
+    await assertProjectInWorkspace(projectId, workspaceId);
+
+    return prisma.project.delete({
+        where: { id: projectId },
+    });
 };

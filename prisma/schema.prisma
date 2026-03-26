@@ -17,6 +17,7 @@ model User {
   memberships     WorkspaceMember[]
   ownedWorkspaces Workspace[]
   assignedTasks   Task[]
+  comments        Comment[]
   refreshTokens   RefreshToken[]
 
   createdAt DateTime @default(now())
@@ -59,6 +60,7 @@ model Project {
   tasks     Task[]
 }
 
+
 model Task {
   id          String @id @default(uuid())
   title       String
@@ -69,9 +71,23 @@ model Task {
   projectId  String
 
   assignee User? @relation(fields: [assigneeId], references: [id])
-  project  Project @relation(fields: [projectId], references: [id])
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments Comment[]
 
   createdAt   DateTime @default(now())
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  taskId    String
+  authorId  String
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Subscription {

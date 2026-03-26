@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../types/auth.js";
-import { createProjectService, getprojectService, getProjectsService } from "../services/project.service.js";
+import { createProjectService, getprojectService, getProjectsService, updateProjectService, deleteProjectService } from "../services/project.service.js";
 import { handleControllerError } from "../lib/handleControllerError.js";
 
 export const createProject = async (req: AuthRequest, res: Response) => {
@@ -45,3 +45,38 @@ export const getProject = async (req: AuthRequest, res: Response) => {
         handleControllerError(error, res);
     }
 }
+
+export const updateProject = async (req: AuthRequest, res: Response) => {
+    const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+
+    if (!name) {
+        return res.status(400).json({ message: "Project name required" });
+    }
+
+    try {
+        const project = await updateProjectService(
+            req.params.projectId as string,
+            req.user!.workspaceId,
+            req.user!.userId,
+            { name }
+        );
+
+        res.json(project);
+    } catch (error: any) {
+        handleControllerError(error, res);
+    }
+};
+
+export const deleteProject = async (req: AuthRequest, res: Response) => {
+    try {
+        await deleteProjectService(
+            req.params.projectId as string,
+            req.user!.workspaceId,
+            req.user!.userId
+        );
+
+        res.json({ message: "Project deleted successfully" });
+    } catch (error: any) {
+        handleControllerError(error, res);
+    }
+};

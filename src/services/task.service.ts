@@ -1,10 +1,10 @@
 import { prisma } from "../lib/prisma.js";
-import { 
-    assertWorkspaceMember, 
+import {
+    assertWorkspaceMember,
     assertWorkspaceRole,
-    assertProjectInWorkspace, 
-    assertUserInWorkspace, 
-    assertTaskInWorkspace 
+    assertProjectInWorkspace,
+    assertUserInWorkspace,
+    assertTaskInWorkspace
 } from "./authorization.service.js";
 
 export const createTaskService = async ({
@@ -24,7 +24,7 @@ export const createTaskService = async ({
 }) => {
     await assertWorkspaceMember(userId, workspaceId);
     await assertProjectInWorkspace(projectId, workspaceId);
-    
+
     if (assigneeId) {
         await assertUserInWorkspace(assigneeId, workspaceId);
     }
@@ -41,8 +41,8 @@ export const createTaskService = async ({
 };
 
 export const getTasksByProjectService = async (
-    projectId: string, 
-    workspaceId: string, 
+    projectId: string,
+    workspaceId: string,
     userId: string
 ) => {
     await assertWorkspaceMember(userId, workspaceId);
@@ -64,22 +64,38 @@ export const getWorkspaceTasksService = async (
         status?: "TODO" | "IN_PROGRESS" | "DONE";
         assigneeId?: string;
     },
-    userId: string
+    userId: string,
+    pagination: { page: number; limit: number }
 ) => {
     await assertWorkspaceMember(userId, workspaceId);
 
-    return prisma.task.findMany({
-        where: {
-            project: {
-                workspaceId,
-            },
-            ...(filters.status && { status: filters.status }),
-            ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
+    const where = {
+        project: {
+            workspaceId,
         },
-        orderBy: {
-            createdAt: "desc",
+        ...(filters.status && { status: filters.status }),
+        ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
+    };
+
+    const [data, total] = await Promise.all([
+        prisma.task.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            skip: (pagination.page - 1) * pagination.limit,
+            take: pagination.limit,
+        }),
+        prisma.task.count({ where }),
+    ]);
+
+    return {
+        data,
+        meta: {
+            page: pagination.page,
+            limit: pagination.limit,
+            total,
+            totalPages: Math.ceil(total / pagination.limit),
         },
-    });
+    };
 };
 
 export const getTaskService = async (
