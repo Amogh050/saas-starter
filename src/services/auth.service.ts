@@ -65,11 +65,10 @@ export const signupService = async ({ email, password, name }: SignupInput) => {
             },
         });
 
-        // 7 - generate access token (15m) with payload { userId, workspaceId, role: "admin" }
+        // 7 - generate access token (15m) with payload { userId, workspaceId }
         const accessToken = generateAccessToken({
             userId: user.id,
             workspaceId: workspace.id,
-            role: "ADMIN",
         });
 
         // 8 - generate refresh token (7d) with payload { userId }
@@ -131,8 +130,7 @@ export const loginService = async ({ email, password }: LoginInput) => {
         throw new Error("WORKSPACE_NOT_FOUND");
     }
 
-    const role = user.memberships.find(m => m.workspaceId === workspaceId)?.role || "MEMBER";
-    const tokenPayload = { userId: user.id, workspaceId, role };
+    const tokenPayload = { userId: user.id, workspaceId };
     const accessToken = generateAccessToken(tokenPayload);
     const refreshToken = generateRefreshToken({ userId: user.id });
 
@@ -195,8 +193,7 @@ export const refreshService = async (refreshToken: string, ipAddress?: string, d
 
     if (!workspaceId) throw new Error("WORKSPACE_NOT_FOUND");
 
-    const role = user.memberships.find(m => m.workspaceId === workspaceId)?.role || "MEMBER";
-    const accessToken = generateAccessToken({ userId: user.id, workspaceId, role });
+    const accessToken = generateAccessToken({ userId: user.id, workspaceId });
     const newRefreshToken = generateRefreshToken({ userId: user.id });
     const newExpiresAt = getTokenExpiry(newRefreshToken);
 

@@ -3,7 +3,6 @@ import { Request } from "express";
 export type AuthUser = {
     userId: string;
     workspaceId: string;
-    role?: string;
     type?: string;
 };
 

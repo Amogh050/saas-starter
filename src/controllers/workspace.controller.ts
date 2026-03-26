@@ -7,18 +7,14 @@ import {
     getMembersService,
     removeMemberService,
 } from "../services/workspace.service.js";
+import { handleControllerError } from "../lib/handleControllerError.js";
 
 export const getWorkspace = async (req: AuthRequest, res: Response) => {
     try {
-        const workspace = await getWorkspaceService(req.user!.workspaceId);
-
-        if (!workspace) {
-            return res.status(404).json({ message: "Workspace not found" });
-        }
-
+        const workspace = await getWorkspaceService(req.user!.workspaceId, req.user!.userId);
         res.json(workspace);
     } catch (error: any) {
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };
 
@@ -38,10 +34,7 @@ export const updateWorkspace = async (req: AuthRequest, res: Response) => {
 
         res.json(workspace);
     } catch (error: any) {
-        if (error.message === "NOT_WORKSPACE_OWNER") {
-            return res.status(403).json({ message: "Not workspace owner" });
-        }
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };
 
@@ -61,26 +54,16 @@ export const addMember = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json(member);
     } catch (error: any) {
-        if (error.message === "NOT_WORKSPACE_OWNER") {
-            return res.status(403).json({ message: "Not workspace owner" });
-        }
-        if (error.message === "USER_NOT_FOUND") {
-            return res.status(404).json({ message: "User not found" });
-        }
-        if (error.message === "ALREADY_A_MEMBER") {
-            return res.status(409).json({ message: "User is already a member" });
-        }
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };
 
 export const getMembers = async (req: AuthRequest, res: Response) => {
     try {
-        const members = await getMembersService(req.user!.workspaceId);
-
+        const members = await getMembersService(req.user!.workspaceId, req.user!.userId);
         res.json(members);
     } catch (error: any) {
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };
 
@@ -96,15 +79,6 @@ export const removeMember = async (req: AuthRequest, res: Response) => {
 
         res.json({ message: "Member removed successfully" });
     } catch (error: any) {
-        if (error.message === "NOT_WORKSPACE_OWNER") {
-            return res.status(403).json({ message: "Not workspace owner" });
-        }
-        if (error.message === "MEMBER_NOT_FOUND") {
-            return res.status(404).json({ message: "Member not found" });
-        }
-        if (error.message === "CANNOT_REMOVE_OWNER") {
-            return res.status(400).json({ message: "Cannot remove workspace owner" });
-        }
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };

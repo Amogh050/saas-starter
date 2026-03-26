@@ -1,4 +1,7 @@
 import { prisma } from "../lib/prisma.js";
+import { assertWorkspaceRole, assertWorkspaceMember } from "./authorization.service.js";
+import { AppError } from "../lib/AppError.js";
+import { ErrorCodes } from "../lib/errorCodes.js";
 
 export const createProjectService = async ({
     name,
@@ -9,11 +12,7 @@ export const createProjectService = async ({
     workspaceId: string;
     userId: string;
 }) => {
-    const workspace = await prisma.workspace.findUnique({
-        where: { id: workspaceId },
-    });
-
-    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
 
     return prisma.project.create({
         data: {
@@ -23,7 +22,9 @@ export const createProjectService = async ({
     });
 };
 
-export const getProjectsService = async (workspaceId: string) => {
+export const getProjectsService = async (workspaceId: string, userId: string) => {
+    await assertWorkspaceMember(userId, workspaceId);
+
     return prisma.project.findMany({
         where: {
             workspaceId,
@@ -34,11 +35,19 @@ export const getProjectsService = async (workspaceId: string) => {
     });
 };
 
-export const getprojectService = async (projectId: string, workspaceId: string) => {
-    return prisma.project.findFirst({
+export const getprojectService = async (projectId: string, workspaceId: string, userId: string) => {
+    await assertWorkspaceMember(userId, workspaceId);
+
+    const project = await prisma.project.findFirst({
         where: {
             id: projectId,
             workspaceId,
         },
     });
+
+    if (!project) {
+        throw new AppError(404, ErrorCodes.PROJECT_NOT_FOUND, "Project not found");
+    }
+
+    return project;
 };

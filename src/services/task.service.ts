@@ -1,4 +1,10 @@
 import { prisma } from "../lib/prisma.js";
+import { 
+    assertWorkspaceMember, 
+    assertProjectInWorkspace, 
+    assertUserInWorkspace, 
+    assertTaskInWorkspace 
+} from "./authorization.service.js";
 
 export const createTaskService = async ({
     title,
@@ -15,23 +21,11 @@ export const createTaskService = async ({
     workspaceId: string;
     userId: string;
 }) => {
-    const workspace = await prisma.workspace.findUnique({
-        where: { id: workspaceId },
-    });
-
-    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
-
+    await assertWorkspaceMember(userId, workspaceId);
+    await assertProjectInWorkspace(projectId, workspaceId);
+    
     if (assigneeId) {
-        const member = await prisma.workspaceMember.findFirst({
-            where: {
-                userId: assigneeId,
-                workspaceId,
-            },
-        });
-
-        if (!member) {
-            throw new Error("ASSIGNEE_NOT_IN_WORKSPACE");
-        }
+        await assertUserInWorkspace(assigneeId, workspaceId);
     }
 
     return prisma.task.create({
@@ -45,17 +39,13 @@ export const createTaskService = async ({
     });
 };
 
-export const getTasksByProjectService = async (projectId: string, workspaceId: string) => {
-    const project = await prisma.project.findFirst({
-        where: {
-            id: projectId,
-            workspaceId,
-        },
-    });
-
-    if (!project) {
-        throw new Error("PROJECT_NOT_FOUND");
-    }
+export const getTasksByProjectService = async (
+    projectId: string, 
+    workspaceId: string, 
+    userId: string
+) => {
+    await assertWorkspaceMember(userId, workspaceId);
+    await assertProjectInWorkspace(projectId, workspaceId);
 
     return prisma.task.findMany({
         where: {
@@ -72,8 +62,11 @@ export const getWorkspaceTasksService = async (
     filters: {
         status?: "TODO" | "IN_PROGRESS" | "DONE";
         assigneeId?: string;
-    }
+    },
+    userId: string
 ) => {
+    await assertWorkspaceMember(userId, workspaceId);
+
     return prisma.task.findMany({
         where: {
             project: {
@@ -90,8 +83,12 @@ export const getWorkspaceTasksService = async (
 
 export const getTaskService = async (
     taskId: string,
-    workspaceId: string
+    workspaceId: string,
+    userId: string
 ) => {
+    await assertWorkspaceMember(userId, workspaceId);
+    await assertTaskInWorkspace(taskId, workspaceId);
+
     return prisma.task.findFirst({
         where: {
             id: taskId,
@@ -115,36 +112,11 @@ export const updateTaskService = async (
         assigneeId?: string | null;
     }
 ) => {
-    const workspace = await prisma.workspace.findUnique({
-        where: { id: workspaceId },
-    });
-
-    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
-
-    const task = await prisma.task.findFirst({
-        where: {
-            id: taskId,
-            project: {
-                workspaceId,
-            },
-        },
-    });
-
-    if (!task) {
-        throw new Error("TASK_NOT_FOUND");
-    }
+    await assertWorkspaceMember(userId, workspaceId);
+    await assertTaskInWorkspace(taskId, workspaceId);
 
     if (updates.assigneeId) {
-        const member = await prisma.workspaceMember.findFirst({
-            where: {
-                userId: updates.assigneeId,
-                workspaceId,
-            },
-        });
-
-        if (!member) {
-            throw new Error("ASSIGNEE_NOT_IN_WORKSPACE");
-        }
+        await assertUserInWorkspace(updates.assigneeId, workspaceId);
     }
 
     return prisma.task.update({
@@ -160,24 +132,8 @@ export const deleteTaskService = async (
     workspaceId: string,
     userId: string
 ) => {
-    const workspace = await prisma.workspace.findUnique({
-        where: { id: workspaceId },
-    });
-
-    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
-
-    const task = await prisma.task.findFirst({
-        where: {
-            id: taskId,
-            project: {
-                workspaceId,
-            },
-        },
-    });
-
-    if (!task) {
-        throw new Error("TASK_NOT_FOUND");
-    }
+    await assertWorkspaceMember(userId, workspaceId);
+    await assertTaskInWorkspace(taskId, workspaceId);
 
     return prisma.task.delete({
         where: {
