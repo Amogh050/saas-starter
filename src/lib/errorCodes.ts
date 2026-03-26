@@ -8,6 +8,7 @@ export const ErrorCodes = {
   MEMBER_NOT_FOUND: "MEMBER_NOT_FOUND",
   ALREADY_A_MEMBER: "ALREADY_A_MEMBER",
   CANNOT_REMOVE_OWNER: "CANNOT_REMOVE_OWNER",
+  CANNOT_CHANGE_OWNER_ROLE: "CANNOT_CHANGE_OWNER_ROLE",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

@@ -130,3 +130,50 @@ export const removeMemberService = async ({
         where: { id: memberId },
     });
 };
+
+export const updateMemberRoleService = async ({
+    workspaceId,
+    userId,
+    memberId,
+    role,
+}: {
+    workspaceId: string;
+    userId: string;
+    memberId: string;
+    role: "ADMIN" | "MEMBER";
+}) => {
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
+
+    const member = await prisma.workspaceMember.findFirst({
+        where: {
+            id: memberId,
+            workspaceId,
+        },
+    });
+
+    if (!member) {
+        throw new AppError(404, ErrorCodes.MEMBER_NOT_FOUND, "Member not found");
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+    });
+
+    if (workspace && member.userId === workspace.ownerId) {
+        throw new AppError(
+            400,
+            ErrorCodes.CANNOT_CHANGE_OWNER_ROLE,
+            "Cannot change workspace owner's role",
+        );
+    }
+
+    return prisma.workspaceMember.update({
+        where: { id: memberId },
+        data: { role },
+        include: {
+            user: {
+                select: { id: true, email: true, name: true },
+            },
+        },
+    });
+};

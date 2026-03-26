@@ -6,6 +6,7 @@ import {
     addMemberService,
     getMembersService,
     removeMemberService,
+    updateMemberRoleService,
 } from "../services/workspace.service.js";
 import { handleControllerError } from "../lib/handleControllerError.js";
 
@@ -78,6 +79,28 @@ export const removeMember = async (req: AuthRequest, res: Response) => {
         });
 
         res.json({ message: "Member removed successfully" });
+    } catch (error: any) {
+        handleControllerError(error, res);
+    }
+};
+
+export const updateMemberRole = async (req: AuthRequest, res: Response) => {
+    const { memberId } = req.params as { memberId: string };
+    const { role } = req.body as { role: "ADMIN" | "MEMBER" };
+
+    if (!role || !["ADMIN", "MEMBER"].includes(role)) {
+        return res.status(400).json({ message: "Valid role is required (ADMIN or MEMBER)" });
+    }
+
+    try {
+        const member = await updateMemberRoleService({
+            workspaceId: req.user!.workspaceId,
+            userId: req.user!.userId,
+            memberId,
+            role,
+        });
+
+        res.json(member);
     } catch (error: any) {
         handleControllerError(error, res);
     }
