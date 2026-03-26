@@ -1,10 +1,11 @@
 import { Response } from "express";
 import { AuthRequest } from "../types/auth.js";
 import { getSubscriptionService, updateSubscriptionService } from "../services/subscription.service.js";
+import { handleControllerError } from "../lib/handleControllerError.js";
 
 export const getSubscription = async (req: AuthRequest, res: Response) => {
     try {
-        const subscription = await getSubscriptionService(req.user!.workspaceId);
+        const subscription = await getSubscriptionService(req.user!.userId, req.user!.workspaceId);
 
         if (!subscription) {
             return res.status(404).json({ message: "Subscription not found" });
@@ -12,7 +13,7 @@ export const getSubscription = async (req: AuthRequest, res: Response) => {
 
         res.json(subscription);
     } catch (error: any) {
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };
 
@@ -32,9 +33,6 @@ export const updateSubscription = async (req: AuthRequest, res: Response) => {
 
         res.json(subscription);
     } catch (error: any) {
-        if (error.message === "NOT_WORKSPACE_OWNER") {
-            return res.status(403).json({ message: "Not workspace owner" });
-        }
-        res.status(500).json({ message: "Internal server error" });
+        handleControllerError(error, res);
     }
 };

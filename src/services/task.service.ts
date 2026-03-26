@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { 
     assertWorkspaceMember, 
+    assertWorkspaceRole,
     assertProjectInWorkspace, 
     assertUserInWorkspace, 
     assertTaskInWorkspace 
@@ -132,7 +133,7 @@ export const deleteTaskService = async (
     workspaceId: string,
     userId: string
 ) => {
-    await assertWorkspaceMember(userId, workspaceId);
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
     await assertTaskInWorkspace(taskId, workspaceId);
 
     return prisma.task.delete({
