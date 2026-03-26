@@ -1,6 +1,9 @@
 import { prisma } from "../lib/prisma.js";
+import { assertWorkspaceRole } from "./authorization.service.js";
 
-export const getSubscriptionService = async (workspaceId: string) => {
+export const getSubscriptionService = async (userId: string, workspaceId: string) => {
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
+
     return prisma.subscription.findUnique({
         where: { workspaceId },
     });
@@ -15,6 +18,8 @@ export const updateSubscriptionService = async ({
     userId: string;
     plan: "FREE" | "PRO";
 }) => {
+    await assertWorkspaceRole(userId, workspaceId, ["ADMIN"]);
+
     const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
     });
